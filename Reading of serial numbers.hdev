@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<hdevelop file_version="1.2" halcon_version="21.11.0.0">
+<procedure name="main">
+<interface/>
+<body>
+<c>*</c>
+<c>*该程序演示了使用极坐标变换来校正CD上的序列号，之后使用OCR读取校正后的字符。</c>
+<c>* </c>
+<c>* 初始化</c>
+<l>dev_update_off()          // 设置设备更新关闭，这样可以加快图像显示速度</l>
+<l>read_image(Image, 'cd_print')   // 从文件中读取图像并存储在Image变量中</l>
+<c></c>
+<c>* cd_print cemera</c>
+<l>dev_close_window()         // 关闭窗口</l>
+<l>dev_open_window_fit_image(Image, 0, 0, 640, 480, WindowHandle) // 在窗口中打开图像，并将其适应窗口大小</l>
+<l>get_image_size(Image, Width, Height) // 获取图像的宽度和高度</l>
+<l>dev_set_draw('margin')     // 设置边距</l>
+<l>dev_set_line_width(2)      // 设置线宽</l>
+<l>set_display_font(WindowHandle, 16, 'mono', 'true', 'false')  // 设置窗口字体</l>
+<l>Pi := rad(180)             // 设置π的值为180度的弧度值 </l>
+<c></c>
+<c>* 初始化一些变量</c>
+<l>AnnulusInner := 0.90      // 设置内圆环的半径</l>
+<l>AnnulusOuter := 0.99      // 设置外圆环的半径</l>
+<l>CharWidthFraction := 0.01 // 设置字符宽度</l>
+<c></c>
+<c>* 提取外圆轮廓并拟合获取圆心坐标与半径</c>
+<l>edges_sub_pix(Image, Edges, 'canny', 1, 20, 40) // 边缘检测，获取边缘图像</l>
+<l>select_shape_xld(Edges, ContourBorder, 'circularity', 'and', 0.9, 1) // 从边缘图像中选择满足特定条件的形状，此处选择圆形</l>
+<l>fit_circle_contour_xld(ContourBorder, 'algebraic', -1, 0, 0, 3, 2, CenterRow, CenterColumn, Radius, StartPhi, EndPhi, PointOrder) // 拟合圆形轮廓并获取其圆心和半径</l>
+<l>dev_display(Image)         // 在窗口中显示原始图像</l>
+<l>dev_set_color('green')     // 设置颜色为绿色</l>
+<l>dev_display(ContourBorder) // 在窗口中显示圆形轮廓</l>
+<l>dev_disp_text('提取外圆轮廓并拟合获取圆心坐标与半径', 'window', 12, 12, 'black', [], []) // 在窗口中显示一段文本</l>
+<l>disp_continue_message(WindowHandle, 'black', 'true') // 显示一条消息以提示用户操作，该消息将一直显示，直到用户点击“继续”按钮</l>
+<l>stop()                     // 程序结束</l>
+<c></c>
+<c>* 将带字符的环形空间转换为极坐标。</c>
+<l>WidthPolar := 2 * Pi * Radius * AnnulusOuter   // 计算极坐标图像的宽度</l>
+<l>HeightPolar := Radius *(AnnulusOuter - AnnulusInner)   // 计算极坐标图像的高度</l>
+<l>RadiusStart := Radius * AnnulusOuter   // 极坐标图像的起始半径</l>
+<l>RadiusEnd := Radius * AnnulusInner   // 极坐标图像的终止半径</l>
+<l>AngleStart := 2 * Pi   // 极坐标图像的起始角度（360度）</l>
+<l>AngleEnd := 0   // 极坐标图像的终止角度（0度）</l>
+<l>polar_trans_image_ext(Image, PolarTransImage, CenterRow, CenterColumn, \
+AngleStart, AngleEnd, RadiusStart, RadiusEnd, WidthPolar, HeightPolar, 'bilinear')   // 进行极坐标变换</l>
+<l>dev_resize_window_fit_image(PolarTransImage, 0, 0, 1000, 1000)   // 调整窗口大小，使得图像能够完全显示</l>
+<l>dev_display(PolarTransImage)   // 显示极坐标图像</l>
+<l>stop()   // 停止程序运行</l>
+<c></c>
+<c>* 分割字符</c>
+<l>CharWidth := WidthPolar * CharWidthFraction   // 计算字符宽度</l>
+<l>CharHeight := CharWidth                       // 字符高度等于字符宽度</l>
+<l>mean_image(PolarTransImage, ImageMean, 2 * CharWidth, 2 * CharHeight)  // 计算图像均值</l>
+<l>dyn_threshold(PolarTransImage, ImageMean, RegionThreshold, 10, 'dark')  // 动态二值化</l>
+<l>connection(RegionThreshold, ConnectedRegions)  // 连通区域分析</l>
+<l>select_shape(ConnectedRegions, RegionChar, ['height','width','row'], 'and', \
+[CharHeight * 0.1,CharWidth * 0.3,HeightPolar * 0.25], \
+[CharHeight * 1.1,CharWidth * 1.1,HeightPolar * 0.75])  // 选择符合条件的区域</l>
+<l>sort_region(RegionChar, RegionCharSort, 'character', 'true', 'row')   // 对字符区域按行排序</l>
+<l>dev_set_colored(12)  // 设置显示颜色</l>
+<l>dev_display(PolarTransImage)  // 显示极坐标变换后的图像</l>
+<l>dev_display(RegionCharSort)   // 显示分割后的字符区域</l>
+<l>stop()   // 停止执行，等待用户操作</l>
+<c></c>
+<c>* 读取字符</c>
+<l>read_ocr_class_mlp('Industrial_Rej.omc', OCRHandle)   // 读取OCR分类器模型</l>
+<l>do_ocr_multi_class_mlp(RegionCharSort, PolarTransImage, OCRHandle, Class, Confidence)  // 对字符区域进行OCR识别，获取识别结果和置信度</l>
+<c></c>
+<c>* 将单个字符连接成一个字符串</c>
+<l>SNString := sum(Class)  // 将识别结果转换为字符串</l>
+<c></c>
+<c>* 结果可视化</c>
+<l>dev_resize_window_fit_image(Image, 0, 0, 640, 480)  // 调整窗口大小适应图像</l>
+<l>set_display_font(WindowHandle, 16, 'mono', 'true', 'false')  // 设置显示字体</l>
+<l>dev_display(Image)  // 显示原始图像</l>
+<l>dev_disp_text('S/N: ' + SNString, 'window', 12, 12, 'black', [], [])  // 在图像上显示识别结果和标题</l>
+<l>polar_trans_region_inv(RegionCharSort, XYTransRegion, CenterRow, CenterColumn, AngleStart, AngleEnd, RadiusStart, RadiusEnd, WidthPolar, HeightPolar, Width, Height, 'nearest_neighbor')  // 对字符区域进行反极坐标变换</l>
+<l>dev_set_colored(12)  // 设置显示颜色</l>
+<l>dev_display(XYTransRegion)  // 显示反变换后的字符区域</l>
+<c></c>
+<c>* 清理分类器</c>
+<l>clear_ocr_class_mlp(OCRHandle)  // 清理OCR分类器</l>
+<l>dev_disp_text('      程序结束      ', 'window', 'bottom', 'right', 'black', [], [])  // 在窗口底部右侧显示程序结束提示</l>
+<c></c>
+<c></c>
+</body>
+<docu id="main">
+<parameters/>
+</docu>
+</procedure>
+</hdevelop>

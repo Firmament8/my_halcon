@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<hdevelop file_version="1.2" halcon_version="21.11.0.0">
+<procedure name="main">
+<interface/>
+<body>
+<l>read_image (Image, 'fabrik')</l>
+<l>read_image (Image0, 'letters')</l>
+<c> </c>
+<l>open_file ('ha_image.txt', 'output_binary', FileHandle)</l>
+<c> </c>
+<l>serialize_image (Image, SerializedItemHandle)</l>
+<l>serialize_image (Image0, SerializedItemHandle0)</l>
+<c> </c>
+<c>//序列化：</c>
+<l>fwrite_serialized_item (FileHandle, SerializedItemHandle)</l>
+<l>fwrite_serialized_item (FileHandle, SerializedItemHandle0)</l>
+<c> </c>
+<l>close_file (FileHandle)</l>
+<c> </c>
+<l>open_file ('ha_image.txt', 'input_binary', FileHandle)</l>
+<c> </c>
+<l>fread_serialized_item (FileHandle, SerializedItemHandle1)</l>
+<l>fread_serialized_item (FileHandle, SerializedItemHandle2)</l>
+<c> </c>
+<c>//反序列化：</c>
+<l>deserialize_image (Image1, SerializedItemHandle1)</l>
+<l>deserialize_image (Image2, SerializedItemHandle2)</l>
+<c> </c>
+<l>close_file (FileHandle)</l>
+<c></c>
+</body>
+<docu id="main">
+<parameters/>
+</docu>
+</procedure>
+</hdevelop>
